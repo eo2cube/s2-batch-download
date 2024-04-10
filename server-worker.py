@@ -70,7 +70,7 @@ class S(BaseHTTPRequestHandler):
         logging.info("GET request,\nPath: %s\nHeaders:\n%s\n", str(self.path), str(self.headers))
 
         if self.path == '/':
-            f = open('./app/index.html', 'rb')
+            f = open('./ui/dist/index.html', 'rb')
             self.send_header('Content-type', 'text/html')
             self.end_headers()
             self.wfile.write(f.read())
@@ -79,7 +79,7 @@ class S(BaseHTTPRequestHandler):
         
         if self.path.startswith('/assets/'):
             filename = self.path.replace('/assets/','')
-            f = open('./app/assets/'+filename, 'rb')
+            f = open('./ui/dist/assets/'+filename, 'rb')
             if self.path.endswith('.css'):
                 self.send_header('Content-type', 'text/css')
             else:
