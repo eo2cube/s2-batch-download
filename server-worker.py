@@ -199,6 +199,10 @@ def run_worker():
 
         os.mkdir('./' + jobname)
 
+        f = open('./' + jobname + "/" + jobname + ".txt", "a") 
+        f.write(json.dumps(data))
+        f.close()
+
         for item in search.items():
             yymmdd = str(item.datetime)[2:10].replace('-', '')
             for band in bands:
