@@ -18,8 +18,8 @@
   </div>
 
   <h2>Indices</h2>
-  <div class="checkboxcontainer" v-for="index in ['NDVI','NDRE', 'NGRDI', 'SAVI', 'MOIS']">
-    <input type="checkbox" :id="index" :value="index" v-model="indices"><label :for="index">{{ index }}</label>
+  <div class="checkboxcontainer" v-for="index in ['ndvi','ndre', 'ngrdi', 'savi', 'mois']">
+    <input type="checkbox" :id="index" :value="index" v-model="indices"><label :for="index">{{ index.toUpperCase() }}</label>
   </div>
 
   <h2>Filename Pattern</h2>
@@ -45,7 +45,7 @@ const bbox = ref('13.18260, 53.81978, 13.286973, 53.840044');
 const start = ref('2024-03-05');
 const end = ref('2024-03-09');  // try until -23
 const bands = ref(['red','green','blue']);
-const indices = ref(['NDVI']);
+const indices = ref(['ndvi']);
 const pattern = ref('yymmdd-name.tiff')
 
 const jobname = ref(null);
