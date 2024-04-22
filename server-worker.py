@@ -92,7 +92,7 @@ class S(BaseHTTPRequestHandler):
         if self.path.startswith("/download/"):
             try:
                 jobname = self.path.replace('/download/','').replace('.zip','')
-                filename = './' + jobname + '/'+jobname+'.zip'
+                filename = './jobs/' + jobname + '/'+jobname+'.zip'
                 logging.info(filename)
                 f = open(filename, 'rb')
                 self.send_header('Content-type', 'application/zip')
@@ -138,7 +138,7 @@ class S(BaseHTTPRequestHandler):
                 str(self.path), str(self.headers), post_data.decode('utf-8'))
 
         if(self.path == '/api/status'):
-            ready = os.path.isfile('./'+data['jobname']+'/'+data['jobname']+'.zip')
+            ready = os.path.isfile('./jobs/'+data['jobname']+'/'+data['jobname']+'.zip')
             logging.info(ready)
             self.wfile.write(('{"ready":' + ('true' if ready else 'false') + '}').encode('utf-8'))
             return
@@ -188,7 +188,7 @@ def run_server(server_class=HTTPServer, handler_class=S, port=8765):
 
 def make_filename(pattern, name, yymmdd, jobname):
     filename = pattern.replace('name', name).replace('yymmdd', yymmdd)
-    return './' + jobname + '/' + filename
+    return './jobs/' + jobname + '/' + filename
 
 def calculate_index(indexname, pattern, yymmdd, jobname):
     if indexname == 'ndvi':
@@ -222,9 +222,9 @@ def run_worker():
         logging.info(jobname)
         search = get_search_result(bbox, start, end)
 
-        os.mkdir('./' + jobname)
+        os.mkdir('./jobs/' + jobname)
 
-        f = open('./' + jobname + "/" + jobname + ".txt", "a") 
+        f = open('./jobs/' + jobname + "/" + jobname + ".txt", "a") 
         f.write(json.dumps(data))
         f.close()
 
@@ -250,8 +250,8 @@ def run_worker():
                 os.remove(filename)
 
         logging.info('Zipping...')
-        shutil.make_archive('./'+jobname, 'zip', './'+jobname)
-        shutil.move('./'+jobname+'.zip', './'+jobname+'/'+jobname+'.zip')
+        shutil.make_archive('./jobs/'+jobname, 'zip', './jobs/'+jobname)
+        shutil.move('./jobs/'+jobname+'.zip', './jobs/'+jobname+'/'+jobname+'.zip')
         logging.info('Finished!')
 
 
