@@ -2,6 +2,8 @@
 
 This tool provides a rudimentary web GUI to query Sentinel-2 satellite imagery for a custom bounding box and time span which can then be downloaded as a single ZIP file. It was developed by the datacube team at [EORC](https://earth-observation.org/) for agricultural scientists at [HSNB](https://www.hs-nb.de/).
 
+Note that `s2-batch-download.py` is a standalone script that you can run directly in Python after editing the config in its first few lines, while `server-worker.py` is intended to be run as a daemon in a Docker container and accepts jobs via the web GUI it serves.
+
 ## Setup
 
 ### Prerequisites
@@ -11,7 +13,7 @@ You'll need Node.js and Docker.
 Clone this repo. 
 
 ### Build the web UI
-```
+```bash
 cd /path/to/repo
 cd ui
 npm install
@@ -20,7 +22,7 @@ npm run build
 This will create a `dist` folder within the `ui` folder, from where the static files are served that form the website that end users actually see.
 
 ### Create an output directory
-```
+```bash
 cd /path/to/repo
 mkdir jobs
 ```
@@ -28,7 +30,7 @@ Or let it point wherever it is convenient for you (lots of gigabytes will be wri
 
 ### Prepare Docker
 Add to your `docker-compose.yml`:
-```
+```yaml
 hsnb:
   build:
     context: ./hsnb
@@ -52,10 +54,10 @@ And update the Caddy config with `docker exec -w /etc/caddy caddy caddy reload` 
 
 ### Start it
 Then finally:
-```
+```bash
 docker compose build hsnb
 docker compose up hsnb
 ```
 
 ## Contact
-Christoph Friedrich <christoph.friedrich@uni-wuerzburg.de>
+Christoph Friedrich <christoph.friedrich (ät) uni-wuerzburg.de>
