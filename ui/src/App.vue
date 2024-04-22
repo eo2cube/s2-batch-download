@@ -74,7 +74,7 @@ function post(url) {
       start: start.value,
       end: end.value,
       bands: bands.value,
-      incides: indices.value,
+      indices: indices.value,
       pattern: pattern.value
     })
   })
