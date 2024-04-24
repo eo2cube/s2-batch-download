@@ -186,9 +186,27 @@ def run_server(server_class=HTTPServer, handler_class=S, port=8765):
     httpd.server_close()
     logging.info('Stopping httpd...\n')
 
+
+###############################################################################
+
+
 def make_filename(pattern, name, yymmdd, jobname):
     filename = pattern.replace('name', name).replace('yymmdd', yymmdd)
     return './jobs/' + jobname + '/' + filename
+
+def save_as_tiff(data, metadata, filename):
+    with rasterio.open(
+        filename,
+        'w',
+        driver ='Gtiff',
+        width = metadata.width,
+        height = metadata.height,
+        count = 1,
+        crs = metadata.crs,
+        transform = metadata.transform,
+        dtype = 'float64'
+    ) as tiff:
+        tiff.write(data, 1)
 
 def calculate_index(indexname, pattern, yymmdd, jobname):
     if indexname == 'ndvi':
@@ -198,19 +216,8 @@ def calculate_index(indexname, pattern, yymmdd, jobname):
                 nir = nir_src.read(1).astype('float64')
                 denominator = nir+red
                 ndvi = np.where(denominator==0., 0, (nir-red)/(nir+red))
-                with rasterio.open(
-                    make_filename(pattern, 'ndvi', yymmdd, jobname),
-                    'w',
-                    driver='Gtiff',
-                    width = red_src.width,
-                    height = red_src.height,
-                    count=1, crs=red_src.crs,
-                    transform=red_src.transform,
-                    dtype='float64'
-                ) as tiff:
-                    tiff.write(ndvi, 1)
+                save_as_tiff(ndvi, red_src, make_filename(pattern, 'ndvi', yymmdd, jobname))
     return
-
 
 def run_worker():
     while True:
@@ -228,24 +235,24 @@ def run_worker():
         f.write(json.dumps(data))
         f.close()
 
-        tempbands = []
+        bands_explicitly_requested = set(bands)
+        bands_implicitly_needed = set()
         for index in indices:
-            if index=='ndvi' and 'red' not in bands:
-                tempbands.append('red')
-            if index=='ndvi' and 'nir' not in bands:
-                tempbands.append('nir')
-
+            if index == 'ndvi':
+                bands_implicitly_needed |= {'red', 'nir'}
+        bands_to_download = bands_explicitly_requested | bands_implicitly_needed  # union of all
+        bands_to_delete_later = bands_to_download - bands_explicitly_requested  # only keep those that were explicitly requested
 
         for item in search.items():
             yymmdd = str(item.datetime)[2:10].replace('-', '')
-            for band in bands + tempbands:
+            for band in bands_to_download:
                 filename = make_filename(pattern, band, yymmdd, jobname)
                 logging.info(filename)
                 save_cog_subset(item.assets[band].href, bbox, filename)
             for index in indices:
                 logging.info("Calculating " + index.upper())
                 calculate_index(index, pattern, yymmdd, jobname)
-            for band in tempbands:
+            for band in bands_to_delete_later:
                 filename = make_filename(pattern, band, yymmdd, jobname)
                 os.remove(filename)
 
