@@ -214,9 +214,24 @@ def calculate_index(indexname, pattern, yymmdd, jobname):
             with rasterio.open(make_filename(pattern, 'nir', yymmdd, jobname)) as nir_src:
                 red = red_src.read(1).astype('float64')
                 nir = nir_src.read(1).astype('float64')
-                denominator = nir+red
-                ndvi = np.where(denominator==0., 0, (nir-red)/(nir+red))
+                denominator = (nir+red)
+                ndvi = np.where(denominator==0., 0, (nir-red)/denominator)
                 save_as_tiff(ndvi, red_src, make_filename(pattern, 'ndvi', yymmdd, jobname))
+
+    if indexname == 'evi':
+        with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
+            with rasterio.open(make_filename(pattern, 'nir', yymmdd, jobname)) as nir_src:
+                with rasterio.open(make_filename(pattern, 'blue', yymmdd, jobname)) as blue_src:
+                    red = red_src.read(1).astype('float64') / 10000
+                    nir = nir_src.read(1).astype('float64') / 10000
+                    blue = blue_src.read(1).astype('float64') / 10000
+                    G = 2.5
+                    C1 = 6
+                    C2 = 7.5
+                    L = 1
+                    denominator = (nir + C1*red - C2*blue + L)
+                    evi = np.clip(np.where(denominator==0., 0, G*((nir-red)/denominator)), -1, 1)
+                    save_as_tiff(evi, red_src, make_filename(pattern, 'evi', yymmdd, jobname))
     return
 
 def run_worker():
@@ -240,6 +255,8 @@ def run_worker():
         for index in indices:
             if index == 'ndvi':
                 bands_implicitly_needed |= {'red', 'nir'}
+            if index == 'evi':
+                bands_implicitly_needed |= {'red', 'nir', 'blue'}
         bands_to_download = bands_explicitly_requested | bands_implicitly_needed  # union of all
         bands_to_delete_later = bands_to_download - bands_explicitly_requested  # only keep those that were explicitly requested
 
