@@ -18,7 +18,7 @@
   </div>
 
   <h2>Indices</h2>
-  <div class="checkboxcontainer" v-for="index in ['ndvi', 'ndre', 'ngrdi', 'savi', 'mois', 'evi']">
+  <div class="checkboxcontainer" v-for="index in ['ndvi', 'ndre', 'ngrdi', 'msavi', 'mois', 'evi', 'ndyi', 'vari', 'ndsi', 'msi', 'reip']">
     <input type="checkbox" :id="index" :value="index" v-model="indices"><label :for="index">{{ index.toUpperCase() }}</label>
   </div>
 

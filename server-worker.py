@@ -194,6 +194,14 @@ def make_filename(pattern, name, yymmdd, jobname):
     filename = pattern.replace('name', name).replace('yymmdd', yymmdd)
     return './jobs/' + jobname + '/' + filename
 
+class Metadata:
+    def __init__(self, width, height, crs, transform):
+        self.width = width
+        self.height = height
+        self.crs = crs
+        self.transform = transform
+
+# The `metadata` parameter can be a DatasetReader or of class Metadata (it's only important that it has `width`, `height`, `crs` and `transform` available via the dot operator)
 def save_as_tiff(data, metadata, filename):
     with rasterio.open(
         filename,
@@ -208,15 +216,81 @@ def save_as_tiff(data, metadata, filename):
     ) as tiff:
         tiff.write(data, 1)
 
+# Takes a coarser array of shape (x,y) and a finer array of shape (2x+a,2y+b) where a,b can be 0 or 1 independently
+# Returns the coarser array doubled in both dimensions, the finer array with possibly the last row and/or column removed to fit the shape of the other array, and the new shape
+def resample_to_same_shape(finer_array, coarser_array):
+    doubled_v = np.repeat(coarser_array, 2, axis=0)
+    doubled_vh = np.repeat(doubled_v, 2, axis=1)
+    result2 = doubled_vh
+    shape_to_match = np.shape(result2)
+    shape_of_finer = np.shape(finer_array)
+    result1 = finer_array
+    if shape_of_finer[0] > shape_to_match[0]:
+        result1 = np.delete(result1, shape_of_finer[0]-1, 0)
+    if shape_of_finer[1] > shape_to_match[1]:
+        result1 = np.delete(result1, shape_of_finer[1]-1, 1)
+    return result1, result2, shape_to_match
+
+# important: the first entry is the band that is used in the *numerator* of the corresponding formula, the second entry the one in the *denominator*
+# this is also the reason why they are arrays and not sets
+BANDS_FOR_INDICES = {
+    'ndvi':  ['nir', 'red'],
+    'evi':   ['red', 'nir', 'blue'],
+    'ndyi':  ['green', 'blue'],
+    'ngrdi': ['green', 'red'],
+    'ndre':  ['nir', 'rededge1'],
+    'msavi': ['red', 'nir'],
+    'vari':  ['green', 'red', 'blue'],  # special case
+    'ndsi':  ['red', 'rededge1'],
+    'msi':   ['swir16', 'nir'],
+    'reip':  ['red', 'rededge1', 'rededge2', 'rededge3'],  # special case
+    'mois':  ['nir08', 'swir16'],
+}
+
 def calculate_index(indexname, pattern, yymmdd, jobname):
-    if indexname == 'ndvi':
-        with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
-            with rasterio.open(make_filename(pattern, 'nir', yymmdd, jobname)) as nir_src:
-                red = red_src.read(1).astype('float64')
-                nir = nir_src.read(1).astype('float64')
-                denominator = (nir+red)
-                ndvi = np.where(denominator==0., 0, (nir-red)/denominator)
-                save_as_tiff(ndvi, red_src, make_filename(pattern, 'ndvi', yymmdd, jobname))
+    # formulas based on a rather simple fraction ("normalized difference" and very similar)
+    if indexname in ['ndvi', 'ndyi', 'ndre', 'ndsi', 'ngrdi', 'mois', 'vari', 'msi']:
+        bandname1 = BANDS_FOR_INDICES[indexname][0]
+        bandname2 = BANDS_FOR_INDICES[indexname][1]
+        with rasterio.open(make_filename(pattern, bandname1, yymmdd, jobname)) as src_band1:
+            with rasterio.open(make_filename(pattern, bandname2, yymmdd, jobname)) as src_band2:
+                # load bands
+                band1 = src_band1.read(1).astype('float64')
+                band2 = src_band2.read(1).astype('float64')
+
+                # resample if necessary
+                band1_shape = np.shape(band1)
+                band2_shape = np.shape(band2)
+                final_shape = None
+                final_transform = None
+                final_crs = src_band1.crs  # they are all the same anyway
+                if band1_shape[0] > band2_shape[0]:  # detect which one is the coarser and which one the finer array
+                    band1, band2, final_shape = resample_to_same_shape(band1, band2)  # resample (and store possibly altered shape)
+                    final_transform = src_band1.transform  # use the transform of the finer array because it has the 10m resolution, not the 20m
+                elif band1_shape[0] < band2_shape[0]:  # the same vice versa
+                    band2, band1, final_shape = resample_to_same_shape(band2, band1)
+                    final_transform = src_band2.transform
+                else:
+                    final_shape = band1_shape  # both are the same -> doesn't matter if it's 1 or 2
+                    final_transform = src_band1.transform
+
+                # calculate
+                numerator = (band1-band2)  # default case (normalized difference)
+                denominator = (band1+band2)
+                if indexname == 'msi':  # more simple case where formula is just the ratio of the bands without any normalization
+                    numerator = band1
+                    denominator = band2
+                if indexname == 'vari':  # special case where additionally to the normal formula blue is subtracted from the denominator
+                    with rasterio.open(make_filename(pattern, 'blue', yymmdd, jobname)) as src_band3:
+                        band3 = src_band3.read(1).astype('float64')
+                        denominator -= band3
+                result = np.where(denominator==0., 0, numerator/denominator)  # set 0 where division would be undefined
+
+                # save
+                metadata = Metadata(final_shape[1], final_shape[0], final_crs, final_transform)
+                save_as_tiff(result, metadata, make_filename(pattern, indexname, yymmdd, jobname))
+
+    # more special formulas
 
     if indexname == 'evi':
         with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
@@ -232,6 +306,33 @@ def calculate_index(indexname, pattern, yymmdd, jobname):
                     denominator = (nir + C1*red - C2*blue + L)
                     evi = np.clip(np.where(denominator==0., 0, G*((nir-red)/denominator)), -1, 1)
                     save_as_tiff(evi, red_src, make_filename(pattern, 'evi', yymmdd, jobname))
+                    
+    if indexname == 'reip':
+        with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
+            with rasterio.open(make_filename(pattern, 'rededge1', yymmdd, jobname)) as re1_src:
+                with rasterio.open(make_filename(pattern, 'rededge2', yymmdd, jobname)) as re2_src:
+                    with rasterio.open(make_filename(pattern, 'rededge3', yymmdd, jobname)) as re3_src:
+                        red = red_src.read(1).astype('float64')
+                        re1 = re1_src.read(1).astype('float64')
+                        re2 = re2_src.read(1).astype('float64')
+                        re3 = re3_src.read(1).astype('float64')
+                        _, re1, _ = resample_to_same_shape(red, re1)
+                        _, re2, _ = resample_to_same_shape(red, re2)
+                        red, re3, final_shape = resample_to_same_shape(red, re3)
+                        denominator = (re2-re1)
+                        reip = np.where(denominator==0., 0, 700+40*(((red+re3)/2)-re1/denominator))
+                        metadata = Metadata(final_shape[1], final_shape[0], red_src.crs, red_src.transform)
+                        save_as_tiff(reip, metadata, make_filename(pattern, indexname, yymmdd, jobname))
+
+    if indexname == 'msavi':
+        with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
+            with rasterio.open(make_filename(pattern, 'nir', yymmdd, jobname)) as nir_src:
+                red = red_src.read(1).astype('float64')
+                nir = nir_src.read(1).astype('float64')
+                radicand = np.square(2*nir+1) - 8*(nir-red)
+                msavi = np.where(radicand<0, 0, 2*nir+1-np.sqrt(radicand)/2)
+                save_as_tiff(msavi, red_src, make_filename(pattern, indexname, yymmdd, jobname))
+
     return
 
 def run_worker():
@@ -253,10 +354,7 @@ def run_worker():
         bands_explicitly_requested = set(bands)
         bands_implicitly_needed = set()
         for index in indices:
-            if index == 'ndvi':
-                bands_implicitly_needed |= {'red', 'nir'}
-            if index == 'evi':
-                bands_implicitly_needed |= {'red', 'nir', 'blue'}
+            bands_implicitly_needed |= set(BANDS_FOR_INDICES[index])
         bands_to_download = bands_explicitly_requested | bands_implicitly_needed  # union of all
         bands_to_delete_later = bands_to_download - bands_explicitly_requested  # only keep those that were explicitly requested
 
