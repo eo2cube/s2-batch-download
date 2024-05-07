@@ -204,14 +204,21 @@ class Metadata:
 # The `metadata` parameter can be a DatasetReader or of class Metadata (it's only important that it has `width`, `height`, `crs` and `transform` available via the dot operator)
 def save_as_tiff(data, metadata, filename):
     data_shape = np.shape(data)
-    bands_to_write_to = [1] if len(data_shape)==2 else list(range(1, data_shape[0]+1))  # e.g. [4,100,200] -> [1,2,3,4]
+    if len(data_shape) == 2:   # single band case -> is 2D
+        number_of_bands = 1    # obviously
+        bands_to_write_to = 1  # just a number, NOT as an array
+    else:  # multiple band case -> is 3D (contains e.g. [4,100,200])
+        number_of_bands = data_shape[0]   # the shape directly contains the needed number
+        bands_to_write_to = list(range(1, number_of_bands+1))  # e.g. 4 -> [1,2,3,4]
+    logging.info(data_shape)
+    logging.info(bands_to_write_to)
     with rasterio.open(
         filename,
         'w',
         driver ='Gtiff',
         width = metadata.width,
         height = metadata.height,
-        count = len(bands_to_write_to),
+        count = number_of_bands,
         crs = metadata.crs,
         transform = metadata.transform,
         dtype = 'float64'
