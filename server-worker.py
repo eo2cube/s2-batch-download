@@ -203,18 +203,20 @@ class Metadata:
 
 # The `metadata` parameter can be a DatasetReader or of class Metadata (it's only important that it has `width`, `height`, `crs` and `transform` available via the dot operator)
 def save_as_tiff(data, metadata, filename):
+    data_shape = np.shape(data)
+    bands_to_write_to = [1] if len(data_shape)==2 else list(range(1, data_shape[0]+1))  # e.g. [4,100,200] -> [1,2,3,4]
     with rasterio.open(
         filename,
         'w',
         driver ='Gtiff',
         width = metadata.width,
         height = metadata.height,
-        count = 1,
+        count = len(bands_to_write_to),
         crs = metadata.crs,
         transform = metadata.transform,
         dtype = 'float64'
     ) as tiff:
-        tiff.write(data, 1)
+        tiff.write(data, bands_to_write_to)
 
 # Takes a coarser array of shape (x,y) and a finer array of shape (2x+a,2y+b) where a,b can be 0 or 1 independently
 # Returns the coarser array doubled in both dimensions, the finer array with possibly the last row and/or column removed to fit the shape of the other array, and the new shape
@@ -335,13 +337,23 @@ def calculate_index(indexname, pattern, yymmdd, jobname):
 
     return
 
+def create_composite(name, pattern, yymmdd, jobname):
+    if name == 'tci':
+        with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
+            with rasterio.open(make_filename(pattern, 'green', yymmdd, jobname)) as green_src:
+                with rasterio.open(make_filename(pattern, 'blue', yymmdd, jobname)) as blue_src:
+                    red = red_src.read(1).astype('float64')
+                    green = green_src.read(1).astype('float64')
+                    blue = blue_src.read(1).astype('float64')
+                    save_as_tiff(np.array([red, green, blue]), red_src, make_filename(pattern, 'tci', yymmdd, jobname))
+
 def run_worker():
     while True:
         data = q.get()
         logging.info(data)
         logging.info("That was the worker")
 
-        bbox, start, end, bands, indices, pattern, jobname = data.values()
+        bbox, start, end, bands, indices, other, pattern, jobname = data.values()
         logging.info(jobname)
         search = get_search_result(bbox, start, end)
 
@@ -355,6 +367,8 @@ def run_worker():
         bands_implicitly_needed = set()
         for index in indices:
             bands_implicitly_needed |= set(BANDS_FOR_INDICES[index])
+        if 'tci' in other:
+            bands_implicitly_needed |= set(['red', 'green', 'blue'])
         bands_to_download = bands_explicitly_requested | bands_implicitly_needed  # union of all
         bands_to_delete_later = bands_to_download - bands_explicitly_requested  # only keep those that were explicitly requested
 
@@ -367,6 +381,9 @@ def run_worker():
             for index in indices:
                 logging.info("Calculating " + index.upper())
                 calculate_index(index, pattern, yymmdd, jobname)
+            for item in other:
+                logging.info("Compositing " + item.upper())
+                create_composite(item, pattern, yymmdd, jobname)
             for band in bands_to_delete_later:
                 filename = make_filename(pattern, band, yymmdd, jobname)
                 os.remove(filename)

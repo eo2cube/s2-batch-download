@@ -22,6 +22,11 @@
     <input type="checkbox" :id="index" :value="index" v-model="indices"><label :for="index">{{ index.toUpperCase() }}</label>
   </div>
 
+  <h2>Other</h2>
+  <div class="checkboxcontainer" v-for="(name, key) in {'tci': 'True-color image'}">
+    <input type="checkbox" :id="key" :value="key" v-model="other"><label :for="key">{{ name }}</label>
+  </div>
+
   <h2>Filename Pattern</h2>
   <input v-model="pattern"> ("yymmdd" and "name" will be replaced by e.g. "240410" and "ndvi")
 
@@ -46,6 +51,7 @@ const start = ref('2024-03-05');
 const end = ref('2024-03-09');  // try until -23
 const bands = ref(['red','green','blue']);
 const indices = ref(['ndvi']);
+const other = ref([]);
 const pattern = ref('yymmdd-name.tiff')
 
 const jobname = ref(null);
@@ -75,6 +81,7 @@ function post(url) {
       end: end.value,
       bands: bands.value,
       indices: indices.value,
+      other: other.value,
       pattern: pattern.value
     })
   })
