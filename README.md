@@ -34,7 +34,6 @@ Add to your `docker-compose.yml`:
 hsnb:
   build:
     context: ./hsnb
-  image: python:3
   container_name: hsnb
   volumes:
   - ./hsnb/jobs:/home/hsnb/jobs
