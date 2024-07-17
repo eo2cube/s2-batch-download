@@ -238,6 +238,12 @@ def resample_to_same_shape(finer_array, coarser_array):
         result1 = np.delete(result1, shape_of_finer[0]-1, 0)
     if shape_of_finer[1] > shape_to_match[1]:
         result1 = np.delete(result1, shape_of_finer[1]-1, 1)
+    if shape_of_finer[0] < shape_to_match[0]:
+        result2 = np.delete(result2, shape_to_match[0]-1, 0)
+        shape_to_match = (shape_to_match[0]-1, shape_to_match[1])
+    if shape_of_finer[1] < shape_to_match[1]:
+        result2 = np.delete(result2, shape_to_match[1]-1, 1)
+        shape_to_match = (shape_to_match[0], shape_to_match[1]-1)
     return result1, result2, shape_to_match
 
 # important: the first entry is the band that is used in the *numerator* of the corresponding formula, the second entry the one in the *denominator*
