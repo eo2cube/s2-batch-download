@@ -111,7 +111,15 @@ function status() {
     })
   }).then(async res => {
     let data = await res.json();
-    if (data.ready) alert('Ready!'); else alert("Not ready yet");
+    if (data.ready) {
+      alert('Ready! You can download your data now.');
+    } else {
+      if (data.processing) {
+        alert("Processing this job and " + data.percentage + "% finished, but not fully ready yet. Please wait and check again later.");
+      } else {
+        alert("Not started processing this job yet. Please wait and check again later.");
+      }
+    }
   });
 }
 </script>

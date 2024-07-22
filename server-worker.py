@@ -11,6 +11,8 @@ from threading import Thread
 
 import queue
 q = queue.Queue()
+current_job = None
+percentage = None
 
 import json
 
@@ -114,13 +116,25 @@ class S(BaseHTTPRequestHandler):
                 'pattern': 'out/yymmdd-name.tiff'  # any folder structure must exist
                 })
         
-        if self.path == '/api/status':
+        if self.path == '/api/queue/length':
             self.end_headers()
-            self.wfile.write(q.qsize)
+            self.wfile.write(str(q.qsize()).encode('utf-8'))
+            logging.info("Queue Length: " + str(q.qsize()))
+            return
+        
+        if self.path == '/api/jobs/current/percentage':
+            self.end_headers()
+            self.wfile.write(str(percentage).encode('utf-8'))
+            logging.info("Current Job Percentage: " + str(percentage))
+            return
+        
+        if self.path == '/api/jobs/current/id':
+            self.end_headers()
+            self.wfile.write(str(current_job).encode('utf-8'))  # wrap in str(...) in case it's None
+            logging.info("Current Job ID: " + str(current_job))
             return
 
         self.end_headers()
-        self.wfile.write(" GET request for {}".format(str(q.qsize())).encode('utf-8'))
 
 
     def do_POST(self):
@@ -139,8 +153,14 @@ class S(BaseHTTPRequestHandler):
 
         if(self.path == '/api/status'):
             ready = os.path.isfile('./jobs/'+data['jobname']+'/'+data['jobname']+'.zip')
-            logging.info(ready)
-            self.wfile.write(('{"ready":' + ('true' if ready else 'false') + '}').encode('utf-8'))
+            processing = (current_job == data['jobname'])
+            reply = ('{' +
+                     '"ready":' + ('true' if ready else 'false') + ',' +
+                     '"processing":' + ('true' if processing else 'false') + ',' +
+                     '"percentage":' + (str(percentage) if processing and percentage is not None else 'null') +
+                     '}')
+            logging.info(reply)
+            self.wfile.write(reply.encode('utf-8'))
             return
 
         bbox, start, end, *rest = data.values()
@@ -370,6 +390,13 @@ def run_worker():
         logging.info(jobname)
         search = get_search_result(bbox, start, end)
 
+        global current_job
+        global percentage
+        current_job = jobname
+        percentage = 0
+        counter = 0
+        total_items = search.matched()
+
         os.mkdir('./jobs/' + jobname)
 
         f = open('./jobs/' + jobname + "/" + jobname + ".txt", "a") 
@@ -386,6 +413,8 @@ def run_worker():
         bands_to_delete_later = bands_to_download - bands_explicitly_requested  # only keep those that were explicitly requested
 
         for item in search.items():
+            counter += 1
+            percentage = round(counter / total_items * 100)
             yymmdd = str(item.datetime)[2:10].replace('-', '')
             for band in bands_to_download:
                 filename = make_filename(pattern, band, yymmdd, jobname)
@@ -405,6 +434,8 @@ def run_worker():
         shutil.make_archive('./jobs/'+jobname, 'zip', './jobs/'+jobname)
         shutil.move('./jobs/'+jobname+'.zip', './jobs/'+jobname+'/'+jobname+'.zip')
         logging.info('Finished!')
+        current_job = None
+        percentage = None
 
 
 ###############################################################################
