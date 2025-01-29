@@ -40,6 +40,21 @@
   <button @click="status">3. Get status</button>
   <a :href="'/download/'+jobname+'.zip'">4. Download</a>
 
+  <h2>Queue</h2>
+  <button @click="getQueue">Get/Update</button>
+  <table>
+    <th>name</th><th>approx. km²</th><th>start</th><th>end</th><th>no. days</th><th>no. bands</th><th>no. indices</th>
+    <tr v-for="job in queue">
+      <td>{{ job.jobname }}</td>
+      <td>{{ Math.floor(getApproxAreaFromBbox(job.bbox)) }}</td>
+      <td>{{ job.start }}</td>
+      <td>{{ job.end }}</td>
+      <td>{{ getDaysBetweenDates(job.start, job.end) }}</td>
+      <td>{{ job.bands.length }}</td>
+      <td>{{ job.indices.length }}</td>
+    </tr>
+  </table>
+
   <footer>Contact: Christoph Friedrich &lt;christoph.friedrich (ät) uni-wuerzburg.de&gt;</footer>
 </template>
 
@@ -55,6 +70,8 @@ const other = ref([]);
 const pattern = ref('yymmdd-name.tiff')
 
 const jobname = ref(null);
+
+const queue = ref(null);
 
 const BANDS = [
   {number: '1',  name: 'coastal'},
@@ -121,6 +138,24 @@ function status() {
       }
     }
   });
+}
+
+function getQueue() {
+  return fetch('/api/queue').then(async res => {
+    queue.value = await res.json();
+  });
+}
+
+function getApproxAreaFromBbox(bbox) {
+  let [lon1, lat1, lon2, lat2] = bbox;
+  let distance_lats = (lat2-lat1) * 111;  // this really is just approximate
+  let distance_lons = (lon2-lon1) * 111 * Math.cos(lat1/90 * Math.PI/2);  // longitudes converge towards the poles
+  return distance_lats * distance_lons;  // simplistic rectangle calculation
+}
+
+function getDaysBetweenDates(start, end) {
+  let diff_in_millisecs = new Date(end) - new Date(start);
+  return diff_in_millisecs / 1000 / 60 / 60 / 24;
 }
 </script>
 

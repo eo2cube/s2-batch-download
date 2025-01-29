@@ -122,6 +122,13 @@ class S(BaseHTTPRequestHandler):
             logging.info("Queue Length: " + str(q.qsize()))
             return
         
+        if self.path == '/api/queue':
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            logging.info(list(q.queue))
+            self.wfile.write(str(list(q.queue)).replace("'", '"').encode('utf-8'))  # The `replace` is a hack to make the Python output a valid JSON
+            return
+        
         if self.path == '/api/jobs/current/percentage':
             self.end_headers()
             self.wfile.write(str(percentage).encode('utf-8'))
