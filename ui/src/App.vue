@@ -44,7 +44,9 @@
   <button @click="getQueue">Get/Update</button>
   <table>
     <th>name</th><th>approx. km²</th><th>start</th><th>end</th><th>no. days</th><th>no. bands</th><th>no. indices</th>
-    <tr v-for="job in queue">
+    <tr v-if="queue==null"><td colspan="7">unknown, click "Get/Update" to fetch info</td></tr>
+    <tr v-else-if="queue.length==0"><td colspan="7">empty at time of fetching</td></tr>
+    <tr v-else v-for="job in queue">
       <td>{{ job.jobname }}</td>
       <td>{{ Math.floor(getApproxAreaFromBbox(job.bbox)) }}</td>
       <td>{{ job.start }}</td>
@@ -191,8 +193,24 @@ div.checkboxcontainer input {
 }
 
 button {
-  margin-top: 20px;
+  margin-right: 10px;
   padding: 5px 20px;
   font-size: 14pt;
+}
+
+table {
+  margin-top: 10px;
+  border-collapse: collapse;
+  border: 1px solid black;
+}
+
+th, td {
+  border: 1px solid black;
+  padding: 5px;
+}
+
+td[colspan] {
+  font-style: italic;
+  text-align: center;
 }
 </style>
