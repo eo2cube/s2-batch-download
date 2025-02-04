@@ -12,6 +12,9 @@
   End: <input v-model="end">
   (format: YYYY-MM-DD)
   
+  <h2>Maximum Cloud Cover</h2>
+  In the specified AOI: <input v-model="max_cloud_cover">%
+  
   <h2>Bands</h2>
   <div class="checkboxcontainer" v-for="band in BANDS">
     <input type="checkbox" :id="band.name" :value="band.name" v-model="bands"><label :for="band.name">Band {{ band.number }} ({{ band.name }})</label>
@@ -66,6 +69,7 @@ import { ref } from "vue";
 const bbox = ref('13.18260, 53.81978, 13.286973, 53.840044');
 const start = ref('2024-03-05');
 const end = ref('2024-03-09');  // try until -23
+const max_cloud_cover = ref('50')
 const bands = ref(['red','green','blue']);
 const indices = ref(['ndvi']);
 const other = ref([]);
@@ -98,6 +102,7 @@ function post(url) {
       bbox: bbox.value.split(',').map(parseFloat),
       start: start.value,
       end: end.value,
+      max_cloud_cover: parseInt(max_cloud_cover.value),
       bands: bands.value,
       indices: indices.value,
       other: other.value,

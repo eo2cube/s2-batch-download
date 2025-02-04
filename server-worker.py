@@ -36,6 +36,9 @@ def save_cog_subset(url, bbox_4326, filename):
         window = rasterio.windows.from_bounds(*bounds, src.transform)
         chunk = src.read(1, window=window)
 
+        if filename is None:
+            return chunk
+
         with rasterio.open(
             filename,
             'w',
@@ -393,7 +396,7 @@ def run_worker():
         logging.info(data)
         logging.info("That was the worker")
 
-        bbox, start, end, bands, indices, other, pattern, jobname = data.values()
+        bbox, start, end, max_cloud_cover, bands, indices, other, pattern, jobname = data.values()
         logging.info(jobname)
         search = get_search_result(bbox, start, end)
 
@@ -419,10 +422,20 @@ def run_worker():
         bands_to_download = bands_explicitly_requested | bands_implicitly_needed  # union of all
         bands_to_delete_later = bands_to_download - bands_explicitly_requested  # only keep those that were explicitly requested
 
+        CLOUD_CLASSES = [0, 1, 2, 3, 8, 9, 10]  # no data, defective, topo shadows, cloud shadows, cloud medium prob, cloud high prob, thin cirrus
+
         for item in search.items():
             counter += 1
             percentage = round(counter / total_items * 100)
             yymmdd = str(item.datetime)[2:10].replace('-', '')
+            if max_cloud_cover:
+                scl = save_cog_subset(item.assets['scl'].href, bbox, None)   # get cog subset without writing to disk (filename=None)
+                classes, counts = np.unique(scl, return_counts=True)
+                cloud_counts = [x[1] for x in zip(classes, counts) if x[0] in CLOUD_CLASSES]
+                cloud_cover = sum(cloud_counts)/sum(counts)
+                if cloud_cover > max_cloud_cover/100:
+                    logging.info("Skipping scene due to cloud cover in AOI being " + str(int(cloud_cover*100)) + "%")
+                    continue
             for band in bands_to_download:
                 filename = make_filename(pattern, band, yymmdd, jobname)
                 logging.info(filename)
