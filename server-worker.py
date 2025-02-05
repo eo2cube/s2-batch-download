@@ -220,9 +220,9 @@ def run_server(server_class=HTTPServer, handler_class=S, port=8765):
 ###############################################################################
 
 
-def make_filename(pattern, name, yymmdd, jobname):
-    filename = pattern.replace('name', name).replace('yymmdd', yymmdd)
-    return './jobs/' + jobname + '/' + filename
+def make_filename(pattern, name, info):
+    filename = pattern.replace('name', name).replace('tile', info['tile']).replace('yymmdd', info['yymmdd'])
+    return './jobs/' + info['jobname'] + '/' + filename
 
 class Metadata:
     def __init__(self, width, height, crs, transform):
@@ -292,13 +292,13 @@ BANDS_FOR_INDICES = {
     'mois':  ['nir08', 'swir16'],
 }
 
-def calculate_index(indexname, pattern, yymmdd, jobname):
+def calculate_index(indexname, pattern, info):
     # formulas based on a rather simple fraction ("normalized difference" and very similar)
     if indexname in ['ndvi', 'ndyi', 'ndre', 'ndsi', 'ngrdi', 'mois', 'vari', 'msi']:
         bandname1 = BANDS_FOR_INDICES[indexname][0]
         bandname2 = BANDS_FOR_INDICES[indexname][1]
-        with rasterio.open(make_filename(pattern, bandname1, yymmdd, jobname)) as src_band1:
-            with rasterio.open(make_filename(pattern, bandname2, yymmdd, jobname)) as src_band2:
+        with rasterio.open(make_filename(pattern, bandname1, info)) as src_band1:
+            with rasterio.open(make_filename(pattern, bandname2, info)) as src_band2:
                 # load bands
                 band1 = src_band1.read(1).astype('float64')
                 band2 = src_band2.read(1).astype('float64')
@@ -326,21 +326,21 @@ def calculate_index(indexname, pattern, yymmdd, jobname):
                     numerator = band1
                     denominator = band2
                 if indexname == 'vari':  # special case where additionally to the normal formula blue is subtracted from the denominator
-                    with rasterio.open(make_filename(pattern, 'blue', yymmdd, jobname)) as src_band3:
+                    with rasterio.open(make_filename(pattern, 'blue', info)) as src_band3:
                         band3 = src_band3.read(1).astype('float64')
                         denominator -= band3
                 result = np.where(denominator==0., 0, numerator/denominator)  # set 0 where division would be undefined
 
                 # save
                 metadata = Metadata(final_shape[1], final_shape[0], final_crs, final_transform)
-                save_as_tiff(result, metadata, make_filename(pattern, indexname, yymmdd, jobname))
+                save_as_tiff(result, metadata, make_filename(pattern, indexname, info))
 
     # more special formulas
 
     if indexname == 'evi':
-        with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
-            with rasterio.open(make_filename(pattern, 'nir', yymmdd, jobname)) as nir_src:
-                with rasterio.open(make_filename(pattern, 'blue', yymmdd, jobname)) as blue_src:
+        with rasterio.open(make_filename(pattern, 'red', info)) as red_src:
+            with rasterio.open(make_filename(pattern, 'nir', info)) as nir_src:
+                with rasterio.open(make_filename(pattern, 'blue', info)) as blue_src:
                     red = red_src.read(1).astype('float64') / 10000
                     nir = nir_src.read(1).astype('float64') / 10000
                     blue = blue_src.read(1).astype('float64') / 10000
@@ -350,13 +350,13 @@ def calculate_index(indexname, pattern, yymmdd, jobname):
                     L = 1
                     denominator = (nir + C1*red - C2*blue + L)
                     evi = np.clip(np.where(denominator==0., 0, G*((nir-red)/denominator)), -1, 1)
-                    save_as_tiff(evi, red_src, make_filename(pattern, 'evi', yymmdd, jobname))
+                    save_as_tiff(evi, red_src, make_filename(pattern, 'evi', info))
                     
     if indexname == 'reip':
-        with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
-            with rasterio.open(make_filename(pattern, 'rededge1', yymmdd, jobname)) as re1_src:
-                with rasterio.open(make_filename(pattern, 'rededge2', yymmdd, jobname)) as re2_src:
-                    with rasterio.open(make_filename(pattern, 'rededge3', yymmdd, jobname)) as re3_src:
+        with rasterio.open(make_filename(pattern, 'red', info)) as red_src:
+            with rasterio.open(make_filename(pattern, 'rededge1', info)) as re1_src:
+                with rasterio.open(make_filename(pattern, 'rededge2', info)) as re2_src:
+                    with rasterio.open(make_filename(pattern, 'rededge3', info)) as re3_src:
                         red = red_src.read(1).astype('float64')
                         re1 = re1_src.read(1).astype('float64')
                         re2 = re2_src.read(1).astype('float64')
@@ -367,28 +367,28 @@ def calculate_index(indexname, pattern, yymmdd, jobname):
                         denominator = (re2-re1)
                         reip = np.where(denominator==0., 0, 700+40*(((red+re3)/2)-re1/denominator))
                         metadata = Metadata(final_shape[1], final_shape[0], red_src.crs, red_src.transform)
-                        save_as_tiff(reip, metadata, make_filename(pattern, indexname, yymmdd, jobname))
+                        save_as_tiff(reip, metadata, make_filename(pattern, indexname, info))
 
     if indexname == 'msavi':
-        with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
-            with rasterio.open(make_filename(pattern, 'nir', yymmdd, jobname)) as nir_src:
+        with rasterio.open(make_filename(pattern, 'red', info)) as red_src:
+            with rasterio.open(make_filename(pattern, 'nir', info)) as nir_src:
                 red = red_src.read(1).astype('float64')
                 nir = nir_src.read(1).astype('float64')
                 radicand = np.square(2*nir+1) - 8*(nir-red)
                 msavi = np.where(radicand<0, 0, 2*nir+1-np.sqrt(radicand)/2)
-                save_as_tiff(msavi, red_src, make_filename(pattern, indexname, yymmdd, jobname))
+                save_as_tiff(msavi, red_src, make_filename(pattern, indexname, info))
 
     return
 
-def create_composite(name, pattern, yymmdd, jobname):
+def create_composite(name, pattern, info):
     if name == 'tci':
-        with rasterio.open(make_filename(pattern, 'red', yymmdd, jobname)) as red_src:
-            with rasterio.open(make_filename(pattern, 'green', yymmdd, jobname)) as green_src:
-                with rasterio.open(make_filename(pattern, 'blue', yymmdd, jobname)) as blue_src:
+        with rasterio.open(make_filename(pattern, 'red', info)) as red_src:
+            with rasterio.open(make_filename(pattern, 'green', info)) as green_src:
+                with rasterio.open(make_filename(pattern, 'blue', info)) as blue_src:
                     red = red_src.read(1).astype('float64')
                     green = green_src.read(1).astype('float64')
                     blue = blue_src.read(1).astype('float64')
-                    save_as_tiff(np.array([red, green, blue]), red_src, make_filename(pattern, 'tci', yymmdd, jobname))
+                    save_as_tiff(np.array([red, green, blue]), red_src, make_filename(pattern, 'tci', info))
 
 def run_worker():
     while True:
@@ -428,6 +428,8 @@ def run_worker():
             counter += 1
             percentage = round(counter / total_items * 100)
             yymmdd = str(item.datetime)[2:10].replace('-', '')
+            tile = str(item.properties['mgrs:utm_zone']) + item.properties['mgrs:latitude_band'] + item.properties['mgrs:grid_square']
+            info = {'yymmdd': yymmdd, 'tile': tile, 'jobname': jobname}
             if max_cloud_cover:
                 scl = save_cog_subset(item.assets['scl'].href, bbox, None)   # get cog subset without writing to disk (filename=None)
                 classes, counts = np.unique(scl, return_counts=True)
@@ -437,17 +439,17 @@ def run_worker():
                     logging.info("Skipping scene due to cloud cover in AOI being " + str(int(cloud_cover*100)) + "%")
                     continue
             for band in bands_to_download:
-                filename = make_filename(pattern, band, yymmdd, jobname)
+                filename = make_filename(pattern, band, info)
                 logging.info(filename)
                 save_cog_subset(item.assets[band].href, bbox, filename)
             for index in indices:
                 logging.info("Calculating " + index.upper())
-                calculate_index(index, pattern, yymmdd, jobname)
+                calculate_index(index, pattern, info)
             for item in other:
                 logging.info("Compositing " + item.upper())
-                create_composite(item, pattern, yymmdd, jobname)
+                create_composite(item, pattern, info)
             for band in bands_to_delete_later:
-                filename = make_filename(pattern, band, yymmdd, jobname)
+                filename = make_filename(pattern, band, info)
                 os.remove(filename)
 
         logging.info('Zipping...')

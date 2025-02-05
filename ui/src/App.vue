@@ -31,7 +31,7 @@
   </div>
 
   <h2>Filename Pattern</h2>
-  <input v-model="pattern"> ("yymmdd" and "name" will be replaced by e.g. "240410" and "ndvi")
+  <input v-model="pattern"> ("yymmdd", "tile" and "name" will be replaced by e.g. "240410", "33UUV" and "ndvi")
 
   <h2>Submit</h2>
 
@@ -73,7 +73,7 @@ const max_cloud_cover = ref('50')
 const bands = ref(['red','green','blue']);
 const indices = ref(['ndvi']);
 const other = ref([]);
-const pattern = ref('yymmdd-name.tiff')
+const pattern = ref('yymmdd-tile-name.tiff')
 
 const jobname = ref(null);
 
