@@ -113,16 +113,26 @@ function post(url) {
 
 function check() {
   post('/api/check').then(async res => {
-    let data = await res.json();
-    alert(`Matched ${data.matched} items. If you think that's okay, click 'Start' now. Otherwise limit your search more and click 'Check' again.`);
+    if(res.ok) {
+      let data = await res.json();
+      alert(`Matched ${data.matched} items. If you think that's okay, click 'Start' now. Otherwise limit your search more and click 'Check' again.`);
+    } else {
+      let info = await res.text();
+      alert(info);
+    }
   });
 }
 
 function order() {
   post('/api/order').then(async res => {
-    let data = await res.json();
-    jobname.value = data.jobname;
-    alert(`Job submitted with ID: ${data.jobname}`);
+    if(res.ok) {
+      let data = await res.json();
+      jobname.value = data.jobname;
+      alert(`Job submitted with ID: ${data.jobname}`);
+    } else {
+      let info = await res.text();
+      alert(info);
+    }
   });
 }
 

@@ -1,0 +1,100 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+        "bbox": {
+            "type": "array",
+            "prefixItems": [
+                {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                },
+                {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                },
+                {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                },
+                {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                }
+            ],
+            "items": false
+        },
+        "start": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 10,
+            "pattern": "^20[0-9][0-9]-(0[1-9]|1[0-2])-([0-2][0-9]|30|31)$"
+        },
+        "end": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 10,
+            "pattern": "^20[0-9][0-9]-(0[1-9]|1[0-2])-([0-2][0-9]|30|31)$"
+        },
+        "max_cloud_cover": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+        },
+        "bands": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+                "type": "string",
+                "enum": ["coastal", "blue", "green", "red", "rededge1", "rededge2", "rededge3", "nir", "nir08", "nir09", "swir16", "swir22"]
+            }
+        },
+        "indices": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+                "type": "string",
+                "enum": ["ndvi", "evi", "ndyi", "ngrdi", "ndre", "msavi", "vari", "ndsi", "msi", "reip", "mois"]
+            }
+        },
+        "other": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+                "type": "string",
+                "enum": ["tci"]
+            }
+        },
+        "pattern": {
+            "type": "string",
+            "allOf": [
+                {
+                    "pattern": "name"
+                },
+                {
+                    "pattern": "tile"
+                },
+                {
+                    "pattern": "yymmdd"
+                },
+                {
+                    "pattern": "\\.tiff?$"
+                }
+            ]
+        }
+    },
+    "required": [
+        "bbox",
+        "start",
+        "end",
+        "max_cloud_cover",
+        "bands",
+        "indices",
+        "other",
+        "pattern"
+    ]
+}

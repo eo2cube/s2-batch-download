@@ -16,6 +16,11 @@ percentage = None
 
 import json
 
+from jsonschema import validate
+f = open('job-schema.json', 'rb')
+schema = json.load(f)
+f.close()
+
 import os
 from datetime import datetime
 
@@ -166,18 +171,56 @@ class S(BaseHTTPRequestHandler):
 
 
     def do_POST(self):
+        # check presence of Content-Length header
+        if not self.headers['Content-Length']:
+            self.send_response(411)  # 411 = Length Required
+            self.end_headers()
+            return
+       
+        # get JSON data from POST body
+        try:
+            content_length = int(self.headers['Content-Length']) # <--- Gets the size of data
+            post_data = self.rfile.read(content_length) # <--- Gets the data itself
+            data = json.loads(post_data)
+        except Exception as err:
+            self.send_response(400)
+            self.send_cors_headers()
+            self.end_headers()
+            self.wfile.write(str(err).encode('utf-8'))
+            return
+        
+        logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
+                str(self.path), str(self.headers), post_data.decode('utf-8'))
+
+        # validate supplied JSON against schema
+        try:
+            validate(data, schema)
+        except Exception as err:
+            logging.info(err)
+            self.send_response(400)
+            self.send_cors_headers()
+            self.end_headers()
+            self.wfile.write(str(err).encode('utf-8'))
+            return
+
+        # read spatiotemporal extent into variables
+        bbox, start, end, *rest = data.values()
+        
+        # enforce bbox=minx,miny,maxx,maxy and startdate<enddate
+        if bbox[0]>=bbox[2] or bbox[1]>=bbox[3] or start>=end:   # the dates are comparable via "number-style string comparison" due to the hierarchical YYYY-MM-DD format
+            self.send_response(400)
+            self.send_cors_headers()
+            self.end_headers()
+            self.wfile.write("ensure bbox format of minx,miny,maxx,maxy and startdate<enddate".encode('utf-8'))
+            return
+        
+        # if we've made it this far, the transmitted job is okay
         self.send_response(200, "ok")
         self.send_cors_headers()
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
-       
-        content_length = int(self.headers['Content-Length']) # <--- Gets the size of data
-        post_data = self.rfile.read(content_length) # <--- Gets the data itself
-        data = json.loads(post_data)
-        logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
-                str(self.path), str(self.headers), post_data.decode('utf-8'))
 
-        bbox, start, end, *rest = data.values()
+        # do the search in the STAC catalog
         search = get_search_result(bbox, start, end)
         
         if(self.path == '/api/check'):
