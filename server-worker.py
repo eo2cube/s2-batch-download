@@ -143,6 +143,20 @@ class S(BaseHTTPRequestHandler):
             self.wfile.write(str(current_job).encode('utf-8'))  # wrap in str(...) in case it's None
             logging.info("Current Job ID: " + str(current_job))
             return
+        
+        if self.path.startswith('/api/jobs/'):
+            self.end_headers()
+            jobname = self.path.replace('/api/jobs/', '')
+            ready = os.path.isfile('./jobs/'+jobname+'/'+jobname+'.zip')
+            processing = (current_job == jobname)
+            reply = ('{' +
+                     '"ready":' + ('true' if ready else 'false') + ',' +
+                     '"processing":' + ('true' if processing else 'false') + ',' +
+                     '"percentage":' + (str(percentage) if processing and percentage is not None else 'null') +
+                     '}')
+            logging.info(reply)
+            self.wfile.write(reply.encode('utf-8'))
+            return
 
         self.end_headers()
 
@@ -160,18 +174,6 @@ class S(BaseHTTPRequestHandler):
         data = json.loads(post_data)
         logging.info("POST request,\nPath: %s\nHeaders:\n%s\n\nBody:\n%s\n",
                 str(self.path), str(self.headers), post_data.decode('utf-8'))
-
-        if(self.path == '/api/status'):
-            ready = os.path.isfile('./jobs/'+data['jobname']+'/'+data['jobname']+'.zip')
-            processing = (current_job == data['jobname'])
-            reply = ('{' +
-                     '"ready":' + ('true' if ready else 'false') + ',' +
-                     '"processing":' + ('true' if processing else 'false') + ',' +
-                     '"percentage":' + (str(percentage) if processing and percentage is not None else 'null') +
-                     '}')
-            logging.info(reply)
-            self.wfile.write(reply.encode('utf-8'))
-            return
 
         bbox, start, end, *rest = data.values()
         search = get_search_result(bbox, start, end)

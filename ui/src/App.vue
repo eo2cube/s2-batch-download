@@ -127,13 +127,7 @@ function order() {
 }
 
 function status() {
-  return fetch('/api/status', {
-    method: "POST",
-    headers: {'Content-Type': 'application/json'}, 
-    body: JSON.stringify({
-      jobname: jobname.value
-    })
-  }).then(async res => {
+  return fetch('/api/jobs/'+jobname.value).then(async res => {
     let data = await res.json();
     if (data.ready) {
       alert('Ready! You can download your data now.');
