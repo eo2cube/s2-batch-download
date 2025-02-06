@@ -66,11 +66,14 @@ def get_search_result(bbox, start, end):
 
 
 class S(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200, "ok")
+    def send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', '*')
+    
+    def do_GET(self):
+        self.send_response(200, "ok")
+        self.send_cors_headers()
         
         logging.info("GET request,\nPath: %s\nHeaders:\n%s\n", str(self.path), str(self.headers))
 
@@ -145,6 +148,7 @@ class S(BaseHTTPRequestHandler):
             return
         
         if self.path.startswith('/api/jobs/'):
+            self.send_header('Content-Type', 'application/json')
             self.end_headers()
             jobname = self.path.replace('/api/jobs/', '')
             ready = os.path.isfile('./jobs/'+jobname+'/'+jobname+'.zip')
@@ -163,9 +167,7 @@ class S(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self.send_response(200, "ok")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', '*')
+        self.send_cors_headers()
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
        
@@ -197,9 +199,7 @@ class S(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(200, "ok")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', '*')
+        self.send_cors_headers()
         self.end_headers()
 
 
