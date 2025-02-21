@@ -3,45 +3,51 @@
     <h1>HSNB Sentinel-2 Data Downloader</h1>
   </header>
 
-  <h2>AOI</h2>
+  <h2>Parameter</h2>
+  <div class="parameterbox">
+  <button @click="importSession">Import</button>
+
+  <h3>AOI</h3>
   BBOX:
   <input v-model="bbox"> (CRS: WGS84 - format: xmin,ymin,xmax,ymax - e.g.: 13.18260,53.81978,13.286973,53.840044)
 
-  <h2>Time</h2>
+  <h3>Time</h3>
   Start: <input v-model="start">
   End: <input v-model="end">
   (format: YYYY-MM-DD)
   
-  <h2>Maximum Cloud Cover</h2>
+  <h3>Maximum Cloud Cover</h3>
   In the specified AOI: <input v-model="max_cloud_cover">%
   
-  <h2>Bands</h2>
+  <h3>Bands</h3>
   <div class="checkboxcontainer" v-for="band in BANDS">
     <input type="checkbox" :id="band.name" :value="band.name" v-model="bands"><label :for="band.name">Band {{ band.number }} ({{ band.name }})</label>
   </div>
 
-  <h2>Indices</h2>
+  <h3>Indices</h3>
   <div class="checkboxcontainer" v-for="index in ['ndvi', 'ndre', 'ngrdi', 'msavi', 'mois', 'evi', 'ndyi', 'vari', 'ndsi', 'msi', 'reip']">
     <input type="checkbox" :id="index" :value="index" v-model="indices"><label :for="index">{{ index.toUpperCase() }}</label>
   </div>
 
-  <h2>Other</h2>
+  <h3>Other</h3>
   <div class="checkboxcontainer" v-for="(name, key) in {'tci': 'True-color image'}">
     <input type="checkbox" :id="key" :value="key" v-model="other"><label :for="key">{{ name }}</label>
   </div>
 
-  <h2>Filename Pattern</h2>
+  <h3>Filename Pattern</h3>
   <input v-model="pattern"> ("yymmdd", "tile" and "name" will be replaced by e.g. "240410", "33UUV" and "ndvi")
 
-  <h2>Submit</h2>
+  <button @click="exportSession">(Export session config)</button>
+  </div>
 
+  <h2>Submit</h2>
   <button @click="check">1. Check search</button>
   <button @click="order">2. Start processing</button>
 
   <h2>Job</h2>
   Name: {{ jobname }}<br>
   <button @click="status">3. Get status</button>
-  <a :href="'/download/'+jobname+'.zip'">4. Download</a>
+  <a :href="'/download/'+jobname+'.zip'">5. Download</a>
 
   <h2>Queue</h2>
   <button @click="getQueue">Get/Update</button>
@@ -76,6 +82,7 @@ const other = ref([]);
 const pattern = ref('yymmdd-tile-name.tiff')
 
 const jobname = ref(null);
+const jobExport = ref(null);
 
 const queue = ref(null);
 
@@ -128,6 +135,7 @@ function order() {
     if(res.ok) {
       let data = await res.json();
       jobname.value = data.jobname;
+      jobExport.value = data;
       alert(`Job submitted with ID: ${data.jobname}`);
     } else {
       let info = await res.text();
@@ -168,6 +176,32 @@ function getDaysBetweenDates(start, end) {
   let diff_in_millisecs = new Date(end) - new Date(start);
   return diff_in_millisecs / 1000 / 60 / 60 / 24;
 }
+
+const saveTemplateAsFile = (filename, dataObjToWrite) => {
+  const blob = new Blob([JSON.stringify(dataObjToWrite)], { type: "text/json" });
+  const link = document.createElement("a");
+
+  link.download = filename;
+  link.href = window.URL.createObjectURL(blob);
+  link.dataset.downloadurl = ["text/json", link.download, link.href].join(":");
+
+  const evt = new MouseEvent("click", {
+    view: window,
+    bubbles: true,
+    cancelable: true,
+  });
+
+  link.dispatchEvent(evt);
+  link.remove()
+};
+
+function exportSession() {
+  saveTemplateAsFile(jobname.value+'.json', jobExport.value);
+}
+
+function importSession() {
+
+}
 </script>
 
 <style scoped>
@@ -187,9 +221,17 @@ footer {
   }
 }
 
-h2 {
+h3 {
   margin-top: 20px;
   margin-bottom: 10px;
+}
+
+div.parameterbox {
+  border: 1px solid gray;
+}
+
+div.columns {
+  column-count: 3;
 }
 
 div.checkboxcontainer {
